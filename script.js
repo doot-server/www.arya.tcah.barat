@@ -128,6 +128,13 @@ function loadSavedOrUrlConfig() {
     const savedConfig = localStorage.getItem("custom_site_config");
     if (savedConfig) {
       const parsed = JSON.parse(savedConfig);
+      // Bersihkan jika tersimpan link pixabay lama yang terblokir 403
+      if (parsed.music && parsed.music.audioUrl && parsed.music.audioUrl.includes("pixabay.com")) {
+        parsed.music.audioUrl = "builtin";
+        parsed.music.title = "Aesthetic Lofi Piano";
+        parsed.music.artist = "Chilled Vibes ✨";
+        localStorage.setItem("custom_site_config", JSON.stringify(parsed));
+      }
       currentConfig = { ...currentConfig, ...parsed };
     }
   } catch (e) {
@@ -140,6 +147,9 @@ function loadSavedOrUrlConfig() {
     const sharedData = params.get("c");
     if (sharedData) {
       const decoded = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
+      if (decoded.music && decoded.music.audioUrl && decoded.music.audioUrl.includes("pixabay.com")) {
+        decoded.music.audioUrl = "builtin";
+      }
       currentConfig = { ...currentConfig, ...decoded };
     }
   } catch (e) {
@@ -206,59 +216,246 @@ function applyBackground() {
 }
 
 // ====================================================================
+// AESTHETIC WEB AUDIO SYNTHESIZER ENGINE (100% BEBAS 403 & SELALU BERBUNYI)
+// ====================================================================
+class AestheticAudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.gainNode = null;
+    this.isPlaying = false;
+    this.volume = 0.6;
+    this.timer = null;
+    this.chordIndex = 0;
+    // Progresi akord lofi piano lembut (Frekuensi nada dalam Hz)
+    // Cmaj9 -> Am9 -> Fmaj9 -> G9sus4
+    this.chords = [
+      [130.81, 196.00, 246.94, 293.66, 329.63, 392.00], // C3, G3, B3, D4, E4, G4
+      [110.00, 164.81, 220.00, 261.63, 329.63, 493.88], // A2, E3, A3, C4, E4, B4
+      [87.31, 130.81, 174.61, 220.00, 261.63, 392.00],  // F2, C3, F3, A3, C4, G4
+      [98.00, 146.83, 174.61, 220.00, 261.63, 293.66]   // G2, D3, F3, A3, C4, D4
+    ];
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+        this.gainNode = this.ctx.createGain();
+        this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+        this.gainNode.connect(this.ctx.destination);
+      }
+    }
+  }
+
+  play() {
+    this.init();
+    if (!this.ctx) return;
+    if (this.ctx.state === "suspended") {
+      this.ctx.resume();
+    }
+    if (this.isPlaying) return;
+    this.isPlaying = true;
+    this.playChordLoop();
+    const widget = document.getElementById("music-widget");
+    if (widget) widget.classList.add("playing");
+  }
+
+  playChordLoop() {
+    if (!this.isPlaying || !this.ctx) return;
+    const chord = this.chords[this.chordIndex];
+    this.chordIndex = (this.chordIndex + 1) % this.chords.length;
+
+    // Arpeggio lembut tiap nada dengan jeda 90ms
+    chord.forEach((freq, i) => {
+      this.triggerTone(freq, i * 0.09, 3.8);
+    });
+
+    this.timer = setTimeout(() => {
+      this.playChordLoop();
+    }, 3600);
+  }
+
+  triggerTone(freq, delay, duration) {
+    if (!this.ctx || !this.gainNode) return;
+    const now = this.ctx.currentTime + delay;
+
+    const osc = this.ctx.createOscillator();
+    osc.type = "triangle"; // Suara hangat mirip Rhodes / electric piano
+    osc.frequency.setValueAtTime(freq, now);
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(950, now);
+
+    const noteGain = this.ctx.createGain();
+    noteGain.gain.setValueAtTime(0.0001, now);
+    noteGain.gain.exponentialRampToValueAtTime(0.2, now + 0.08); // attack lembut
+    noteGain.gain.exponentialRampToValueAtTime(0.06, now + 1.2); // decay hangat
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration); // release halus
+
+    osc.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(this.gainNode);
+
+    osc.start(now);
+    osc.stop(now + duration + 0.1);
+  }
+
+  pause() {
+    this.isPlaying = false;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.ctx && this.gainNode) {
+      this.gainNode.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.15);
+    }
+    const widget = document.getElementById("music-widget");
+    if (widget) widget.classList.remove("playing");
+  }
+
+  setVolume(vol) {
+    this.volume = Math.max(0, Math.min(1, vol));
+    if (this.ctx && this.gainNode) {
+      this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+    }
+  }
+}
+
+const synthEngine = new AestheticAudioEngine();
+let isUsingSynth = true;
+
+// ====================================================================
 // AUDIO PLAYER ENGINE
 // ====================================================================
 function initAudio() {
   audioPlayer = document.getElementById("bg-audio");
   const music = currentConfig.music;
+  const vol = music ? (music.defaultVolume ?? 0.6) : 0.6;
+  synthEngine.setVolume(vol);
 
-  if (music && music.audioUrl) {
-    audioPlayer.src = music.audioUrl;
-    audioPlayer.loop = music.loop !== false;
-    audioPlayer.volume = music.defaultVolume ?? 0.6;
-    
-    document.getElementById("widget-song-title").textContent = music.title || "Background Music";
-    document.getElementById("widget-song-artist").textContent = music.artist || "Aesthetic";
-    document.getElementById("volume-slider").value = audioPlayer.volume;
+  const rawUrl = music ? (music.audioUrl || "").trim() : "";
+  const isPixabay = rawUrl.includes("pixabay.com");
+  isUsingSynth = !rawUrl || rawUrl === "builtin" || isPixabay;
+
+  const titleEl = document.getElementById("widget-song-title");
+  const artistEl = document.getElementById("widget-song-artist");
+  const volSlider = document.getElementById("volume-slider");
+
+  if (isUsingSynth) {
+    if (audioPlayer) {
+      audioPlayer.removeAttribute("src");
+      audioPlayer.pause();
+    }
+    if (titleEl) titleEl.textContent = (music && music.title && music.title !== "Background Music") ? music.title : "Aesthetic Lofi Piano";
+    if (artistEl) artistEl.textContent = (music && music.artist && music.artist !== "Aesthetic") ? music.artist : "Chilled Vibes ✨";
+  } else {
+    if (audioPlayer) {
+      audioPlayer.src = rawUrl;
+      audioPlayer.loop = music.loop !== false;
+      audioPlayer.volume = vol;
+    }
+    if (titleEl) titleEl.textContent = music.title || "Background Music";
+    if (artistEl) artistEl.textContent = music.artist || "Aesthetic";
+  }
+
+  if (volSlider) volSlider.value = vol;
+
+  // Fallback otomatis jika file audio eksternal gagal dimuat (403, 404, CORS error)
+  if (audioPlayer) {
+    audioPlayer.onerror = () => {
+      console.warn("File audio eksternal gagal dimuat / terkena blokir 403. Beralih otomatis ke Built-in Synth Engine agar selalu bersuara!");
+      isUsingSynth = true;
+      if (titleEl) titleEl.textContent = "Aesthetic Lofi Piano";
+      if (artistEl) artistEl.textContent = "Chilled Vibes ✨";
+      synthEngine.play();
+    };
   }
 }
 
 function playAudio() {
-  if (audioPlayer && audioPlayer.src) {
-    const playPromise = audioPlayer.play();
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          document.getElementById("music-widget").classList.add("playing");
-        })
-        .catch(err => {
-          console.warn("Autoplay dicegah oleh kebijakan browser, lagu akan otomatis berputar saat sentuhan/klik pertama di mana saja:", err);
-          // Bila browser membutuhkan interaksi pertama pengguna, klik/sentuhan apa pun di layar akan langsung menyalakan lagu
-          const handleFirstInteraction = () => {
-            audioPlayer.play().then(() => {
-              document.getElementById("music-widget").classList.add("playing");
-            }).catch(() => {});
-            window.removeEventListener("click", handleFirstInteraction);
-            window.removeEventListener("touchstart", handleFirstInteraction);
-            window.removeEventListener("keydown", handleFirstInteraction);
-          };
-          window.addEventListener("click", handleFirstInteraction, { once: true });
-          window.addEventListener("touchstart", handleFirstInteraction, { once: true });
-          window.addEventListener("keydown", handleFirstInteraction, { once: true });
-        });
+  const tryStartAudio = () => {
+    if (isUsingSynth) {
+      synthEngine.play();
+    } else if (audioPlayer && audioPlayer.src) {
+      const playPromise = audioPlayer.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            const widget = document.getElementById("music-widget");
+            if (widget) widget.classList.add("playing");
+          })
+          .catch(err => {
+            console.warn("Autoplay browser menahan audio sampai ada sentuhan layar:", err);
+            attachFirstInteraction();
+          });
+      }
+    } else {
+      isUsingSynth = true;
+      synthEngine.play();
     }
-  }
+  };
+
+  const attachFirstInteraction = () => {
+    const handleGesture = () => {
+      if (isUsingSynth) {
+        synthEngine.play();
+      } else if (audioPlayer && audioPlayer.src) {
+        audioPlayer.play().then(() => {
+          const widget = document.getElementById("music-widget");
+          if (widget) widget.classList.add("playing");
+        }).catch(() => {
+          // Jika URL eksternal tetap gagal saat interaksi, aktifkan synth
+          isUsingSynth = true;
+          synthEngine.play();
+        });
+      } else {
+        isUsingSynth = true;
+        synthEngine.play();
+      }
+      cleanup();
+    };
+
+    const cleanup = () => {
+      window.removeEventListener("pointerdown", handleGesture);
+      window.removeEventListener("click", handleGesture);
+      window.removeEventListener("touchstart", handleGesture);
+      window.removeEventListener("keydown", handleGesture);
+      window.removeEventListener("scroll", handleGesture);
+    };
+
+    window.addEventListener("pointerdown", handleGesture, { once: true });
+    window.addEventListener("click", handleGesture, { once: true });
+    window.addEventListener("touchstart", handleGesture, { once: true });
+    window.addEventListener("keydown", handleGesture, { once: true });
+    window.addEventListener("scroll", handleGesture, { once: true });
+  };
+
+  tryStartAudio();
+  attachFirstInteraction();
 }
 
 function toggleAudio() {
-  if (!audioPlayer) return;
   const widget = document.getElementById("music-widget");
-  if (audioPlayer.paused) {
-    audioPlayer.play();
-    widget.classList.add("playing");
+  if (isUsingSynth) {
+    if (synthEngine.isPlaying) {
+      synthEngine.pause();
+    } else {
+      synthEngine.play();
+    }
+  } else if (audioPlayer && audioPlayer.src) {
+    if (audioPlayer.paused) {
+      audioPlayer.play().then(() => {
+        if (widget) widget.classList.add("playing");
+      }).catch(() => {
+        isUsingSynth = true;
+        synthEngine.play();
+      });
+    } else {
+      audioPlayer.pause();
+      if (widget) widget.classList.remove("playing");
+    }
   } else {
-    audioPlayer.pause();
-    widget.classList.remove("playing");
+    isUsingSynth = true;
+    synthEngine.play();
   }
 }
 
@@ -450,24 +647,27 @@ function initDomElements() {
   musicToggleBtn.addEventListener("click", toggleAudio);
   
   volumeSlider.addEventListener("input", (e) => {
-    if (audioPlayer) {
-      audioPlayer.volume = parseFloat(e.target.value);
-      updateVolumeIcon(audioPlayer.volume);
-    }
+    const vol = parseFloat(e.target.value);
+    if (audioPlayer) audioPlayer.volume = vol;
+    synthEngine.setVolume(vol);
+    updateVolumeIcon(vol);
   });
 
   volumeToggleBtn.addEventListener("click", () => {
-    if (!audioPlayer) return;
-    if (audioPlayer.volume > 0) {
-      audioPlayer.dataset.lastVol = audioPlayer.volume;
-      audioPlayer.volume = 0;
+    const currentVol = isUsingSynth ? synthEngine.volume : (audioPlayer ? audioPlayer.volume : 0.6);
+    if (currentVol > 0) {
+      volumeToggleBtn.dataset.lastVol = currentVol;
+      if (audioPlayer) audioPlayer.volume = 0;
+      synthEngine.setVolume(0);
       volumeSlider.value = 0;
+      updateVolumeIcon(0);
     } else {
-      const restore = parseFloat(audioPlayer.dataset.lastVol || 0.6);
-      audioPlayer.volume = restore;
+      const restore = parseFloat(volumeToggleBtn.dataset.lastVol || 0.6);
+      if (audioPlayer) audioPlayer.volume = restore;
+      synthEngine.setVolume(restore);
       volumeSlider.value = restore;
+      updateVolumeIcon(restore);
     }
-    updateVolumeIcon(audioPlayer.volume);
   });
 
   function updateVolumeIcon(vol) {
@@ -720,9 +920,9 @@ function populateModalForm() {
   document.getElementById("input-particles").value = currentConfig.effects.particles || "sparkles";
 
   // Tab Musik
-  document.getElementById("input-music-url").value = currentConfig.music.audioUrl || "";
-  document.getElementById("input-music-title").value = currentConfig.music.title || "";
-  document.getElementById("input-music-artist").value = currentConfig.music.artist || "";
+  document.getElementById("input-music-url").value = currentConfig.music.audioUrl || "builtin";
+  document.getElementById("input-music-title").value = currentConfig.music.title || "Aesthetic Lofi Piano";
+  document.getElementById("input-music-artist").value = currentConfig.music.artist || "Chilled Vibes ✨";
 }
 
 // Membaca form modal ke state
@@ -764,9 +964,13 @@ function readModalForm() {
   currentConfig.effects.particles = document.getElementById("input-particles").value;
 
   // Tab Musik
-  currentConfig.music.audioUrl = document.getElementById("input-music-url").value.trim();
-  currentConfig.music.title = document.getElementById("input-music-title").value.trim() || "Background Music";
-  currentConfig.music.artist = document.getElementById("input-music-artist").value.trim() || "Aesthetic";
+  let musicUrl = document.getElementById("input-music-url").value.trim();
+  if (!musicUrl || musicUrl.includes("pixabay.com")) {
+    musicUrl = "builtin";
+  }
+  currentConfig.music.audioUrl = musicUrl;
+  currentConfig.music.title = document.getElementById("input-music-title").value.trim() || "Aesthetic Lofi Piano";
+  currentConfig.music.artist = document.getElementById("input-music-artist").value.trim() || "Chilled Vibes ✨";
 }
 
 // Menghasilkan link share dengan konfigurasi terenkripsi base64

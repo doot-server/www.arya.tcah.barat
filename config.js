@@ -32,13 +32,13 @@ const CONFIG = {
 
   // 2. PENGATURAN MUSIK / LAGU
   music: {
-    // Masukkan link URL file MP3 lagu favorit Anda.
-    // Pastikan link langsung berakhiran .mp3 atau file audio yang dapat diakses publik.
-    audioUrl: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3",
+    // Mode audio bawaan: "builtin" (Aesthetic Lo-Fi Piano Synthesizer - 100% bebas 403 & selalu berbunyi)
+    // Anda juga bisa memasukkan link file MP3 sendiri atau memilih file lagu langsung dari folder di Admin Panel!
+    audioUrl: "builtin",
     
     // Judul & penyanyi yang tampil di pemutar musik
-    title: "Lofi Study Beats",
-    artist: "Chilled Vibes",
+    title: "Aesthetic Lofi Piano",
+    artist: "Chilled Vibes ✨",
 
     // Volume awal (0.0 sampai 1.0)
     defaultVolume: 0.6,

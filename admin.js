@@ -4,9 +4,106 @@
  * ====================================================================
  */
 
+// Web Audio API Synthesizer (100% Bebas 403 & Selalu Berbunyi)
+class AestheticAudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.gainNode = null;
+    this.isPlaying = false;
+    this.volume = 0.6;
+    this.timer = null;
+    this.chordIndex = 0;
+    this.chords = [
+      [130.81, 196.00, 246.94, 293.66, 329.63, 392.00],
+      [110.00, 164.81, 220.00, 261.63, 329.63, 493.88],
+      [87.31, 130.81, 174.61, 220.00, 261.63, 392.00],
+      [98.00, 146.83, 174.61, 220.00, 261.63, 293.66]
+    ];
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+        this.gainNode = this.ctx.createGain();
+        this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+        this.gainNode.connect(this.ctx.destination);
+      }
+    }
+  }
+
+  play() {
+    this.init();
+    if (!this.ctx) return;
+    if (this.ctx.state === "suspended") {
+      this.ctx.resume();
+    }
+    if (this.isPlaying) return;
+    this.isPlaying = true;
+    this.playChordLoop();
+  }
+
+  playChordLoop() {
+    if (!this.isPlaying || !this.ctx) return;
+    const chord = this.chords[this.chordIndex];
+    this.chordIndex = (this.chordIndex + 1) % this.chords.length;
+
+    chord.forEach((freq, i) => {
+      this.triggerTone(freq, i * 0.09, 3.8);
+    });
+
+    this.timer = setTimeout(() => {
+      this.playChordLoop();
+    }, 3600);
+  }
+
+  triggerTone(freq, delay, duration) {
+    if (!this.ctx || !this.gainNode) return;
+    const now = this.ctx.currentTime + delay;
+
+    const osc = this.ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(freq, now);
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(950, now);
+
+    const noteGain = this.ctx.createGain();
+    noteGain.gain.setValueAtTime(0.0001, now);
+    noteGain.gain.exponentialRampToValueAtTime(0.2, now + 0.08);
+    noteGain.gain.exponentialRampToValueAtTime(0.06, now + 1.2);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(this.gainNode);
+
+    osc.start(now);
+    osc.stop(now + duration + 0.1);
+  }
+
+  pause() {
+    this.isPlaying = false;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.ctx && this.gainNode) {
+      this.gainNode.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.15);
+    }
+  }
+
+  setVolume(vol) {
+    this.volume = Math.max(0, Math.min(1, vol));
+    if (this.ctx && this.gainNode) {
+      this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+    }
+  }
+}
+
 // State konfigurasi admin
 let adminConfig = null;
 let previewAudio = null;
+const adminSynth = new AestheticAudioEngine();
 
 document.addEventListener("DOMContentLoaded", () => {
   previewAudio = document.getElementById("adm-preview-audio");
@@ -84,6 +181,7 @@ function setupAuthEvents() {
     logoutBtn.addEventListener("click", () => {
       sessionStorage.removeItem("admin_auth_active");
       if (previewAudio) previewAudio.pause();
+      adminSynth.pause();
       checkAuthSession();
       showToast("Anda telah keluar dari panel admin.");
     });
@@ -99,6 +197,13 @@ function initDashboard() {
   if (savedConfig) {
     try {
       adminConfig = JSON.parse(savedConfig);
+      // Bersihkan jika tersimpan URL pixabay lama yang 403
+      if (adminConfig.music && adminConfig.music.audioUrl && adminConfig.music.audioUrl.includes("pixabay.com")) {
+        adminConfig.music.audioUrl = "builtin";
+        adminConfig.music.title = "Aesthetic Lofi Piano";
+        adminConfig.music.artist = "Chilled Vibes ✨";
+        localStorage.setItem("custom_site_config", JSON.stringify(adminConfig));
+      }
     } catch (e) {
       adminConfig = JSON.parse(JSON.stringify(CONFIG));
     }
@@ -106,7 +211,6 @@ function initDashboard() {
     adminConfig = JSON.parse(JSON.stringify(CONFIG));
   }
 
-  // Pastikan struktur header ada
   // Pastikan struktur header dan card ada
   if (!adminConfig.header) {
     adminConfig.header = {
@@ -171,9 +275,9 @@ function populateAdminForm() {
   document.getElementById("adm-input-particles").value = adminConfig.effects.particles || "sparkles";
 
   // 4. Pane Musik
-  document.getElementById("adm-input-music-url").value = adminConfig.music.audioUrl || "";
-  document.getElementById("adm-input-music-title").value = adminConfig.music.title || "";
-  document.getElementById("adm-input-music-artist").value = adminConfig.music.artist || "";
+  document.getElementById("adm-input-music-url").value = adminConfig.music.audioUrl || "builtin";
+  document.getElementById("adm-input-music-title").value = adminConfig.music.title || "Aesthetic Lofi Piano";
+  document.getElementById("adm-input-music-artist").value = adminConfig.music.artist || "Chilled Vibes ✨";
   const vol = adminConfig.music.defaultVolume ?? 0.6;
   document.getElementById("adm-input-music-vol").value = vol;
   document.getElementById("adm-vol-label").textContent = `${Math.round(vol * 100)}%`;
@@ -318,9 +422,11 @@ function setupEditorEvents() {
 
   // Volume Slider
   document.getElementById("adm-input-music-vol").addEventListener("input", (e) => {
-    document.getElementById("adm-vol-label").textContent = `${Math.round(e.target.value * 100)}%`;
+    const vol = parseFloat(e.target.value);
+    document.getElementById("adm-vol-label").textContent = `${Math.round(vol * 100)}%`;
     readFormData();
-    if (previewAudio) previewAudio.volume = parseFloat(e.target.value);
+    if (previewAudio) previewAudio.volume = vol;
+    adminSynth.setVolume(vol);
   });
 
   // Presets Background
@@ -388,19 +494,36 @@ function setupEditorEvents() {
   const playBtn = document.getElementById("adm-preview-play-btn");
   const playIcon = document.getElementById("adm-play-icon");
   playBtn.addEventListener("click", () => {
-    if (!previewAudio) return;
-    if (previewAudio.paused) {
-      const url = document.getElementById("adm-input-music-url").value.trim();
-      if (!url) {
-        showToast("Masukkan link URL lagu terlebih dahulu!");
-        return;
+    const url = document.getElementById("adm-input-music-url").value.trim();
+    const isBuiltin = !url || url === "builtin" || url.includes("pixabay.com");
+    const vol = parseFloat(document.getElementById("adm-input-music-vol").value);
+
+    if (isBuiltin) {
+      if (previewAudio) previewAudio.pause();
+      if (adminSynth.isPlaying) {
+        adminSynth.pause();
+        playIcon.className = "fa-solid fa-play";
+      } else {
+        adminSynth.setVolume(vol);
+        adminSynth.play();
+        playIcon.className = "fa-solid fa-pause";
       }
+      return;
+    }
+
+    if (!previewAudio) return;
+    adminSynth.pause();
+    if (previewAudio.paused) {
       previewAudio.src = url;
-      previewAudio.volume = parseFloat(document.getElementById("adm-input-music-vol").value);
+      previewAudio.volume = vol;
       previewAudio.play().then(() => {
         playIcon.className = "fa-solid fa-pause";
       }).catch(err => {
-        showToast("Gagal memutar audio preview.");
+        console.warn("Gagal memutar audio eksternal:", err);
+        showToast("Audio eksternal gagal dimuat. Beralih ke nada bawaan...");
+        adminSynth.setVolume(vol);
+        adminSynth.play();
+        playIcon.className = "fa-solid fa-pause";
       });
     } else {
       previewAudio.pause();
@@ -480,9 +603,13 @@ function readFormData() {
   adminConfig.effects.particles = document.getElementById("adm-input-particles").value;
 
   // 4. Musik
-  adminConfig.music.audioUrl = document.getElementById("adm-input-music-url").value.trim();
-  adminConfig.music.title = document.getElementById("adm-input-music-title").value.trim() || "Background Music";
-  adminConfig.music.artist = document.getElementById("adm-input-music-artist").value.trim() || "Aesthetic";
+  let musicUrl = document.getElementById("adm-input-music-url").value.trim();
+  if (!musicUrl || musicUrl.includes("pixabay.com")) {
+    musicUrl = "builtin";
+  }
+  adminConfig.music.audioUrl = musicUrl;
+  adminConfig.music.title = document.getElementById("adm-input-music-title").value.trim() || "Aesthetic Lofi Piano";
+  adminConfig.music.artist = document.getElementById("adm-input-music-artist").value.trim() || "Chilled Vibes ✨";
   adminConfig.music.defaultVolume = parseFloat(document.getElementById("adm-input-music-vol").value);
 
   // 5. Password Admin
