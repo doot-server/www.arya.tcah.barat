@@ -107,6 +107,7 @@ function initDashboard() {
   }
 
   // Pastikan struktur header ada
+  // Pastikan struktur header dan card ada
   if (!adminConfig.header) {
     adminConfig.header = {
       type: "image",
@@ -114,6 +115,12 @@ function initDashboard() {
       shape: "circle",
       size: 80,
       badgeText: adminConfig.typewriter.badge || "Pesan Spesial ✨"
+    };
+  }
+  if (!adminConfig.card) {
+    adminConfig.card = {
+      style: "gelap",
+      opacity: 0.75
     };
   }
 
@@ -139,11 +146,18 @@ function populateAdminForm() {
   
   toggleHeaderInputs(header.type || "image");
 
-  // 2. Pane Teks
+  // 2. Pane Teks & Card Style
   document.getElementById("adm-input-lines").value = (adminConfig.typewriter.lines || []).join("\n");
   document.getElementById("adm-input-speed").value = adminConfig.typewriter.typingSpeed || 75;
   document.getElementById("adm-speed-label").textContent = `${adminConfig.typewriter.typingSpeed || 75} ms`;
   document.getElementById("adm-input-footer").value = adminConfig.typewriter.footerText || "With warm wishes ✨";
+
+  // Card Background Style & Opacity
+  const card = adminConfig.card || { style: "gelap", opacity: 0.75 };
+  const cardRadio = document.querySelector(`input[name='adm-card-style'][value='${card.style || "gelap"}']`);
+  if (cardRadio) cardRadio.checked = true;
+  document.getElementById("adm-input-card-opacity").value = card.opacity ?? 0.75;
+  document.getElementById("adm-card-opacity-label").textContent = `${Math.round((card.opacity ?? 0.75) * 100)}%`;
 
   // 3. Pane Background
   const isImg = adminConfig.background.type === "image";
@@ -267,6 +281,23 @@ function setupEditorEvents() {
     readFormData();
   });
 
+  // Card Background Style Radio & Opacity Slider
+  document.querySelectorAll("input[name='adm-card-style']").forEach(radio => {
+    radio.addEventListener("change", () => {
+      readFormData();
+      updateLivePreview();
+    });
+  });
+
+  const cardOpacityInput = document.getElementById("adm-input-card-opacity");
+  if (cardOpacityInput) {
+    cardOpacityInput.addEventListener("input", (e) => {
+      document.getElementById("adm-card-opacity-label").textContent = `${Math.round(e.target.value * 100)}%`;
+      readFormData();
+      updateLivePreview();
+    });
+  }
+
   // Background Mode Radio
   document.querySelectorAll("input[name='adm-bg-type']").forEach(radio => {
     radio.addEventListener("change", (e) => {
@@ -302,12 +333,35 @@ function setupEditorEvents() {
     });
   });
 
+  // 3. File Upload Picker untuk Musik / Lagu
+  const fileMusicInput = document.getElementById("adm-file-music");
+  const fileMusicLabel = document.getElementById("adm-file-music-label");
+  if (fileMusicInput) {
+    fileMusicInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        fileMusicLabel.textContent = file.name;
+        handleAudioFileUpload(file, (dataUrl, cleanTitle) => {
+          document.getElementById("adm-input-music-url").value = dataUrl;
+          const titleInput = document.getElementById("adm-input-music-title");
+          if (!titleInput.value.trim() || titleInput.value === "Background Music" || titleInput.value === "Lofi Study Beats") {
+            titleInput.value = cleanTitle;
+          }
+          readFormData();
+          updateLivePreview();
+          showToast(`Lagu "${file.name}" siap diputar! 🎵`);
+        });
+      }
+    });
+  }
+
   // Presets Lagu
   document.querySelectorAll(".btn-chip-music").forEach(chip => {
     chip.addEventListener("click", () => {
       document.getElementById("adm-input-music-url").value = chip.dataset.url;
       document.getElementById("adm-input-music-title").value = chip.dataset.title;
       document.getElementById("adm-input-music-artist").value = chip.dataset.artist;
+      if (fileMusicLabel) fileMusicLabel.textContent = "Pilih File Lagu dari Folder...";
       readFormData();
       updateLivePreview();
       showToast("Preset lagu dipilih!");
@@ -401,12 +455,21 @@ function readFormData() {
     badgeText: document.getElementById("adm-input-badge-text").value.trim() || "Pesan Spesial ✨"
   };
 
-  // 2. Teks
+  // 2. Teks & Card Style
   const linesRaw = document.getElementById("adm-input-lines").value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
   adminConfig.typewriter.lines = linesRaw.length > 0 ? linesRaw : ["Halo dunia! ✨"];
   adminConfig.typewriter.typingSpeed = parseInt(document.getElementById("adm-input-speed").value, 10) || 75;
   adminConfig.typewriter.footerText = document.getElementById("adm-input-footer").value.trim() || "With warm wishes ✨";
   adminConfig.typewriter.badge = adminConfig.header.badgeText;
+
+  // Latar Kotak Teks (Card Style)
+  const cardStyleRadio = document.querySelector("input[name='adm-card-style']:checked");
+  const cardStyle = cardStyleRadio ? cardStyleRadio.value : "gelap";
+  const cardOpacity = parseFloat(document.getElementById("adm-input-card-opacity").value) || 0.75;
+  adminConfig.card = {
+    style: cardStyle,
+    opacity: cardOpacity
+  };
 
   // 3. Background
   const bgType = document.querySelector("input[name='adm-bg-type']:checked").value;
@@ -442,6 +505,7 @@ function updateLivePreview() {
   const previewFooter = document.getElementById("adm-preview-footer");
   const musicTitle = document.getElementById("adm-prev-music-title");
   const musicArtist = document.getElementById("adm-prev-music-artist");
+  const previewCard = document.querySelector(".preview-card");
 
   // Background
   const bg = adminConfig.background;
@@ -473,6 +537,30 @@ function updateLivePreview() {
     previewBadge.textContent = header.badgeText || "Pesan Spesial ✨";
   } else {
     previewBadge.style.display = "none";
+  }
+
+  // Latar Kotak Teks (Card Style: Gelap / Transparan / Kaca)
+  const card = adminConfig.card || { style: "gelap", opacity: 0.75 };
+  if (previewCard) {
+    if (card.style === "transparan") {
+      previewCard.style.background = "transparent";
+      previewCard.style.borderColor = "transparent";
+      previewCard.style.boxShadow = "none";
+      previewCard.style.backdropFilter = "none";
+      previewText.style.textShadow = "0 2px 10px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,1)";
+    } else if (card.style === "kaca") {
+      previewCard.style.background = `rgba(255, 255, 255, ${(card.opacity || 0.75) * 0.15})`;
+      previewCard.style.borderColor = "rgba(255, 255, 255, 0.25)";
+      previewCard.style.boxShadow = "0 20px 40px rgba(0, 0, 0, 0.45)";
+      previewCard.style.backdropFilter = "blur(16px)";
+      previewText.style.textShadow = "none";
+    } else {
+      previewCard.style.background = `rgba(12, 12, 22, ${card.opacity ?? 0.75})`;
+      previewCard.style.borderColor = "rgba(255, 255, 255, 0.12)";
+      previewCard.style.boxShadow = "0 25px 50px -12px rgba(0, 0, 0, 0.75)";
+      previewCard.style.backdropFilter = "blur(20px)";
+      previewText.style.textShadow = "none";
+    }
   }
 
   // Teks Preview
@@ -511,6 +599,7 @@ function generateShareUrl() {
   try {
     const compactData = {
       header: adminConfig.header,
+      card: adminConfig.card,
       background: adminConfig.background,
       music: adminConfig.music,
       typewriter: adminConfig.typewriter,
@@ -588,6 +677,20 @@ function handleImageFileUpload(file, maxDimension, quality, callback) {
       callback(compressedDataUrl, file.name);
     };
     img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Utility membaca file audio lokal (Choose audio file dari folder)
+function handleAudioFileUpload(file, callback) {
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    showToast("Ukuran audio agak besar (>8MB), disarankan gunakan file di bawah 5MB.");
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const cleanTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+    callback(e.target.result, cleanTitle, file.name);
   };
   reader.readAsDataURL(file);
 }

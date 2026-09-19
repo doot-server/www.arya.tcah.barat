@@ -99,7 +99,19 @@ const CONFIG = {
     showReplayButton: true
   },
 
-  // 5. EFEK VISUAL TAMBAHAN
+  // 5. PENGATURAN LATAR BELAKANG KARTU TEKS
+  card: {
+    // Pilihan tampilan latar kotak teks:
+    // "gelap"       = Kotak gelap pekat (elegan, kontras tinggi & nyaman dibaca)
+    // "transparan"  = Bening total tanpa kotak latar (teks melayang langsung di atas wallpaper)
+    // "kaca"        = Semi-transparan glassmorphism tipis
+    style: "gelap",
+
+    // Tingkat kepekatan latar (0.0 = transparan, 1.0 = hitam pekat)
+    opacity: 0.75
+  },
+
+  // 6. EFEK VISUAL TAMBAHAN
   effects: {
     // Partikel latar: "sparkles" (kelap-kelip), "stars" (bintang jatuh), atau "none" (tanpa efek)
     particles: "sparkles",
@@ -111,7 +123,7 @@ const CONFIG = {
     showCustomizerButton: false
   },
 
-  // 6. PENGATURAN PANEL ADMIN (TERPROTEKSI PASSWORD)
+  // 7. PENGATURAN PANEL ADMIN (TERPROTEKSI PASSWORD)
   admin: {
     // Kata sandi untuk membuka dashboard admin (/admin.html)
     // Silakan ganti dengan kata sandi rahasia Anda sendiri!

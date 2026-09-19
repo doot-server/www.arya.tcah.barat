@@ -123,6 +123,18 @@
             <label for="input-footer">Teks Penutup:</label>
             <input type="text" id="input-footer" placeholder="With warm wishes ✨" />
           </div>
+          <div class="form-group" style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <label>Latar Belakang Kotak Teks:</label>
+            <div class="radio-group" style="flex-wrap: wrap;">
+              <label><input type="radio" name="card-style" value="gelap" checked /> Kotak Gelap</label>
+              <label><input type="radio" name="card-style" value="transparan" /> Bening Transparan</label>
+              <label><input type="radio" name="card-style" value="kaca" /> Kaca Semi-Transparan</label>
+            </div>
+          </div>
+          <div class="form-group" id="group-card-opacity">
+            <label for="input-card-opacity">Kepekatan Latar: <span id="card-opacity-label">75%</span></label>
+            <input type="range" id="input-card-opacity" min="0.1" max="1.0" step="0.05" value="0.75" />
+          </div>
         </div>
 
         <!-- Tab Baru: Foto / Header -->
@@ -220,9 +232,17 @@
         <!-- Tab 3: Musik -->
         <div class="tab-pane" id="tab-music">
           <div class="form-group">
-            <label for="input-music-url">URL File Audio (MP3):</label>
+            <label for="input-music-url">File Musik / Lagu (Dari Folder atau Link):</label>
+            <div class="file-upload-wrapper">
+              <input type="file" id="modal-file-music" accept="audio/*" class="file-input-hidden" />
+              <label for="modal-file-music" class="btn-file-upload">
+                <i class="fa-solid fa-folder-open"></i>
+                <span id="modal-file-music-label">Pilih File Lagu dari Folder...</span>
+              </label>
+              <span class="file-divider">atau gunakan link URL MP3:</span>
+            </div>
             <input type="text" id="input-music-url" placeholder="https://.../lagu.mp3" />
-            <small>Masukkan direct link audio MP3 yang bisa diakses secara publik.</small>
+            <small>Pilih lagu (MP3/M4A/WAV) langsung dari folder perangkat Anda atau masukkan direct link audio.</small>
           </div>
           <div class="presets-container">
             <span>Preset Lagu Bebas Royalti:</span>

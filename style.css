@@ -167,6 +167,35 @@ button {
   transition: var(--transition-smooth);
 }
 
+/* Variasi Background Kartu Teks: Transparan / Gelap / Kaca */
+.message-card.card-style-transparan {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.message-card.card-style-transparan .typewriter-box {
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 1);
+}
+
+.message-card.card-style-gelap {
+  background: rgba(12, 12, 22, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+.message-card.card-style-kaca {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
 .card-header {
   display: flex;
   flex-direction: column;

@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
   applyPageMetadata();
   applyBackground();
   applyHeader();
+  applyCardStyle();
   initAudio();
   initParticles();
   initDomElements();
@@ -78,6 +79,45 @@ function applyHeader() {
     badge.textContent = header.badgeText || currentConfig.typewriter.badge || "Pesan Spesial ✨";
   } else {
     badge.style.display = "none";
+  }
+}
+
+// ====================================================================
+// LATAR BELAKANG KARTU TEKS (TRANSPARAN / GELAP / KACA)
+// ====================================================================
+function applyCardStyle() {
+  const cardEl = document.getElementById("message-card");
+  if (!cardEl) return;
+
+  const card = currentConfig.card || { style: "gelap", opacity: 0.75 };
+  const style = card.style || "gelap";
+  const opacity = (card.opacity !== undefined) ? card.opacity : 0.75;
+
+  // Hapus class gaya kartu lama
+  cardEl.classList.remove("card-style-transparan", "card-style-gelap", "card-style-kaca");
+
+  if (style === "transparan") {
+    cardEl.classList.add("card-style-transparan");
+    cardEl.style.background = "transparent";
+    cardEl.style.borderColor = "transparent";
+    cardEl.style.boxShadow = "none";
+    cardEl.style.backdropFilter = "none";
+    cardEl.style.webkitBackdropFilter = "none";
+  } else if (style === "kaca") {
+    cardEl.classList.add("card-style-kaca");
+    cardEl.style.background = `rgba(255, 255, 255, ${opacity * 0.15})`;
+    cardEl.style.borderColor = "rgba(255, 255, 255, 0.25)";
+    cardEl.style.boxShadow = "0 20px 40px rgba(0, 0, 0, 0.45)";
+    cardEl.style.backdropFilter = "blur(16px)";
+    cardEl.style.webkitBackdropFilter = "blur(16px)";
+  } else {
+    // Default: gelap
+    cardEl.classList.add("card-style-gelap");
+    cardEl.style.background = `rgba(12, 12, 22, ${opacity})`;
+    cardEl.style.borderColor = "rgba(255, 255, 255, 0.12)";
+    cardEl.style.boxShadow = "0 25px 50px -12px rgba(0, 0, 0, 0.75)";
+    cardEl.style.backdropFilter = "blur(20px)";
+    cardEl.style.webkitBackdropFilter = "blur(20px)";
   }
 }
 
@@ -551,6 +591,14 @@ function initDomElements() {
     document.getElementById("darkness-label").textContent = e.target.value;
   });
 
+  const cardOpacityInput = document.getElementById("input-card-opacity");
+  if (cardOpacityInput) {
+    cardOpacityInput.addEventListener("input", (e) => {
+      const label = document.getElementById("card-opacity-label");
+      if (label) label.textContent = `${Math.round(e.target.value * 100)}%`;
+    });
+  }
+
   // Presets klik gambar
   document.querySelectorAll(".btn-chip").forEach(chip => {
     chip.addEventListener("click", () => {
@@ -559,12 +607,33 @@ function initDomElements() {
     });
   });
 
+  // File Picker Lagu di modal
+  const modalFileMusic = document.getElementById("modal-file-music");
+  const modalFileMusicLabel = document.getElementById("modal-file-music-label");
+  if (modalFileMusic) {
+    modalFileMusic.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        modalFileMusicLabel.textContent = file.name;
+        handleAudioFileUpload(file, (dataUrl, cleanTitle) => {
+          document.getElementById("input-music-url").value = dataUrl;
+          const titleInput = document.getElementById("input-music-title");
+          if (!titleInput.value.trim() || titleInput.value === "Background Music" || titleInput.value === "Lofi Study Beats") {
+            titleInput.value = cleanTitle;
+          }
+          showToast(`Lagu "${file.name}" siap diputar! 🎵`);
+        });
+      }
+    });
+  }
+
   // Presets klik lagu
   document.querySelectorAll(".btn-chip-music").forEach(chip => {
     chip.addEventListener("click", () => {
       document.getElementById("input-music-url").value = chip.dataset.url;
       document.getElementById("input-music-title").value = chip.dataset.title;
       document.getElementById("input-music-artist").value = chip.dataset.artist;
+      if (modalFileMusicLabel) modalFileMusicLabel.textContent = "Pilih File Lagu dari Folder...";
       showToast("Preset lagu dipilih!");
     });
   });
@@ -574,6 +643,7 @@ function initDomElements() {
     readModalForm();
     applyBackground();
     applyHeader();
+    applyCardStyle();
     initAudio();
     initParticles();
     settingsModal.classList.remove("open");
@@ -605,6 +675,17 @@ function populateModalForm() {
   document.getElementById("input-speed").value = currentConfig.typewriter.typingSpeed || 75;
   document.getElementById("speed-label").textContent = `${currentConfig.typewriter.typingSpeed || 75} ms`;
   document.getElementById("input-footer").value = currentConfig.typewriter.footerText || "";
+
+  // Card Background Style & Opacity
+  const card = currentConfig.card || { style: "gelap", opacity: 0.75 };
+  const cardRadio = document.querySelector(`input[name='card-style'][value='${card.style || "gelap"}']`);
+  if (cardRadio) cardRadio.checked = true;
+  const cardOpacityEl = document.getElementById("input-card-opacity");
+  if (cardOpacityEl) {
+    cardOpacityEl.value = card.opacity ?? 0.75;
+    const cardOpacityLabel = document.getElementById("card-opacity-label");
+    if (cardOpacityLabel) cardOpacityLabel.textContent = `${Math.round((card.opacity ?? 0.75) * 100)}%`;
+  }
 
   // Tab Foto / Header
   const header = currentConfig.header || {
@@ -652,6 +733,16 @@ function readModalForm() {
   currentConfig.typewriter.typingSpeed = parseInt(document.getElementById("input-speed").value, 10);
   currentConfig.typewriter.footerText = document.getElementById("input-footer").value.trim() || "With warm wishes ✨";
 
+  // Card Background Style & Opacity
+  const cardRadio = document.querySelector("input[name='card-style']:checked");
+  const cardStyle = cardRadio ? cardRadio.value : (currentConfig.card ? currentConfig.card.style : "gelap");
+  const cardOpacityEl = document.getElementById("input-card-opacity");
+  const cardOpacity = cardOpacityEl ? (parseFloat(cardOpacityEl.value) || 0.75) : (currentConfig.card ? currentConfig.card.opacity : 0.75);
+  currentConfig.card = {
+    style: cardStyle,
+    opacity: cardOpacity
+  };
+
   // Tab Foto / Header
   const headerType = document.querySelector("input[name='header-type']:checked").value;
   const headerShape = document.querySelector("input[name='header-shape']:checked").value;
@@ -683,6 +774,7 @@ function copyShareUrl() {
   try {
     const compactData = {
       header: currentConfig.header,
+      card: currentConfig.card,
       background: currentConfig.background,
       music: currentConfig.music,
       typewriter: currentConfig.typewriter,
@@ -748,6 +840,20 @@ function handleImageFileUpload(file, maxDimension, quality, callback) {
       callback(compressedDataUrl, file.name);
     };
     img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Utility membaca file audio lokal (Choose audio file dari folder)
+function handleAudioFileUpload(file, callback) {
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    showToast("Ukuran audio agak besar (>8MB), disarankan gunakan file di bawah 5MB.");
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const cleanTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+    callback(e.target.result, cleanTitle, file.name);
   };
   reader.readAsDataURL(file);
 }

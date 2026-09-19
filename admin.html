@@ -493,6 +493,21 @@
             <label for="adm-input-footer">Teks Penutup Bawah:</label>
             <input type="text" id="adm-input-footer" placeholder="With warm wishes ✨" />
           </div>
+
+          <div class="form-group" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <label>Latar Belakang Kotak Teks (Background Kartu):</label>
+            <div class="radio-group" style="flex-wrap: wrap;">
+              <label><input type="radio" name="adm-card-style" value="gelap" checked /> Kotak Gelap Elegan</label>
+              <label><input type="radio" name="adm-card-style" value="transparan" /> Bening Transparan (Tanpa Kotak)</label>
+              <label><input type="radio" name="adm-card-style" value="kaca" /> Kaca Semi-Transparan</label>
+            </div>
+          </div>
+
+          <div class="form-group" id="adm-group-card-opacity">
+            <label for="adm-input-card-opacity">Kepekatan Latar Kotak Teks: <span id="adm-card-opacity-label">75%</span></label>
+            <input type="range" id="adm-input-card-opacity" min="0.1" max="1.0" step="0.05" value="0.75" />
+            <small>Atur tingkat kepekatan atau transparansi latar belakang teks.</small>
+          </div>
         </div>
 
         <!-- Pane 3: Background -->
@@ -553,9 +568,17 @@
           <h3 style="font-size: 1.15rem; margin-bottom: 16px;">Pengaturan Musik Latar</h3>
 
           <div class="form-group">
-            <label for="adm-input-music-url">URL Direct File MP3:</label>
+            <label for="adm-input-music-url">File Musik / Lagu (Dari Folder atau Link):</label>
+            <div class="file-upload-wrapper">
+              <input type="file" id="adm-file-music" accept="audio/*" class="file-input-hidden" />
+              <label for="adm-file-music" class="btn-file-upload">
+                <i class="fa-solid fa-folder-open"></i>
+                <span id="adm-file-music-label">Pilih File Lagu dari Folder...</span>
+              </label>
+              <span class="file-divider">atau gunakan link URL MP3:</span>
+            </div>
             <input type="text" id="adm-input-music-url" placeholder="https://.../lagu.mp3" />
-            <small>Pastikan link mengarah langsung ke file audio yang berakhiran .mp3.</small>
+            <small>Pilih lagu (MP3/M4A/WAV) langsung dari folder perangkat Anda atau masukkan link URL.</small>
           </div>
 
           <div class="presets-container">
